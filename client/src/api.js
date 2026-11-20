@@ -4,7 +4,7 @@
  * - credentials: 'include' so the httpOnly auth cookie is sent.
  * - Normalises the backend error shape { error: { code, message, details } } into ApiError.
  */
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL || '/api';
 
 export class ApiError extends Error {
   constructor(status, code, message, details) {
