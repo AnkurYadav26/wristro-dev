@@ -29,6 +29,15 @@ export async function issueEmailOtp(email, purpose, { ignoreCooldown = false } =
   await sendOtpEmail(email, code, purpose, OTP_DEFAULTS.ttlMs / 60000);
 }
 
+const OTP_MESSAGES = {
+  NO_OTP: 'No active code. Please request a new one.',
+  EXPIRED: 'This code has expired. Please request a new one.',
+  TOO_MANY_ATTEMPTS: 'Too many incorrect attempts. Please request a new code.',
+  INVALID: 'Incorrect code.',
+  OK: 'This code was already used.',
+};
+const otpError = (outcome) => new AppError(400, `OTP_${outcome === 'OK' ? 'USED' : outcome}`, OTP_MESSAGES[outcome]);
+
 /** Verify a code. Attempts are counted atomically BEFORE comparing, so parallel guesses can't race the limit. */
 export async function verifyEmailOtp(email, purpose, code) {
   const rec = await OtpToken.findOneAndUpdate({ identifier: email, purpose, consumed: false }, { $inc: { attempts: 1 } }, { new: true });
@@ -37,12 +46,25 @@ export async function verifyEmailOtp(email, purpose, code) {
     const used = await OtpToken.findOneAndUpdate({ _id: rec._id, consumed: false }, { $set: { consumed: true } });
     if (used) return true; // lost a race with a parallel correct submission: fall through to failure
   }
-  const messages = {
-    NO_OTP: 'No active code. Please request a new one.',
-    EXPIRED: 'This code has expired. Please request a new one.',
-    TOO_MANY_ATTEMPTS: 'Too many incorrect attempts. Please request a new code.',
-    INVALID: 'Incorrect code.',
-    OK: 'This code was already used.',
-  };
-  throw new AppError(400, `OTP_${outcome === 'OK' ? 'USED' : outcome}`, messages[outcome]);
+  throw otpError(outcome === 'OK' ? 'OK' : outcome);
+}
+
+/**
+ * Verify several codes together, all-or-nothing: every code must be correct before ANY of them is
+ * consumed. Used by admin activation, where both the new admin's and the super admin's codes must
+ * match. If one fails, the other stays usable.
+ */
+export async function verifyEmailOtpTogether(pairs) {
+  const records = [];
+  for (const { identifier, purpose, code } of pairs) {
+    const rec = await OtpToken.findOneAndUpdate(
+      { identifier, purpose, consumed: false }, { $inc: { attempts: 1 } }, { new: true },
+    );
+    const outcome = evaluateAttempt(rec, { code, identifier, purpose, secret: env.OTP_SECRET });
+    if (outcome !== 'OK') throw otpError(outcome);
+    records.push(rec);
+  }
+  await Promise.all(records.map((r) =>
+    OtpToken.findOneAndUpdate({ _id: r._id, consumed: false }, { $set: { consumed: true } })));
+  return true;
 }

@@ -6,6 +6,7 @@ import { AppError, asyncHandler } from '../utils/AppError.js';
 import { validate } from '../middleware/validate.js';
 import { authLimiter, otpLimiter } from '../middleware/security.js';
 import { requireAuth, setAuthCookie, clearAuthCookie } from '../middleware/auth.js';
+// Admin authentication lives in routes/adminAuth.js; the storefront only signs in customers.
 import { emailSchema, passwordSchema, mobileSchema, otpSchema } from '../schemas.js';
 import { issueEmailOtp, verifyEmailOtp } from '../services/otpService.js';
 
@@ -46,15 +47,11 @@ router.post('/verify-email', otpLimiter,
   }));
 
 router.post('/resend-otp', otpLimiter,
-  validate({ body: z.object({ email: emailSchema, purpose: z.enum(['verify_email', 'reset_password', 'admin_login']) }).strict() }),
+  validate({ body: z.object({ email: emailSchema, purpose: z.enum(['verify_email', 'reset_password']) }).strict() }),
   asyncHandler(async (req, res) => {
     const { email, purpose } = req.body;
     const user = await User.findOne({ email });
-    const eligible = user && (
-      purpose === 'verify_email' ? !user.emailVerified
-        : purpose === 'admin_login' ? user.role === 'admin' && user.status === 'active'
-          : true
-    );
+    const eligible = user && (purpose === 'verify_email' ? !user.emailVerified : true);
     if (eligible) await issueEmailOtp(email, purpose);
     res.json({ message: 'If the account exists, a new code has been sent.' }); // same reply either way
   }));
@@ -67,32 +64,9 @@ router.post('/login', authLimiter,
     const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
     if (!user || !ok) throw new AppError(401, 'BAD_CREDENTIALS', 'Incorrect email or password.');
     if (user.status !== 'active') throw new AppError(403, 'ACCOUNT_BLOCKED', 'This account has been disabled. Please contact support.');
-    // Admins must confirm a one-time code emailed to them on EVERY login, so the password step
-    // returns an OTP challenge instead of a session. Confirming the code also proves the email
-    // address is real, so the admin panel never depends on a separate verification step.
-    if (user.role === 'admin') {
-      await issueEmailOtp(user.email, 'admin_login', { ignoreCooldown: true });
-      return res.json({ otpRequired: true, email: user.email, message: 'We emailed you a 6-digit code. Enter it to finish signing in.' });
-    }
     if (!user.emailVerified) throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Please verify your email to continue.', { email });
     user.lastLoginAt = new Date();
     await user.save();
-    setAuthCookie(res, user);
-    res.json({ user: user.toPublic() });
-  }));
-
-// Second step of the admin sign-in: exchange the emailed code for a session.
-router.post('/verify-admin-login', otpLimiter,
-  validate({ body: z.object({ email: emailSchema, otp: otpSchema }).strict() }),
-  asyncHandler(async (req, res) => {
-    const { email, otp } = req.body;
-    await verifyEmailOtp(email, 'admin_login', otp);
-    const user = await User.findOneAndUpdate(
-      { email, role: 'admin', status: 'active' },
-      { $set: { lastLoginAt: new Date(), emailVerified: true } },
-      { new: true },
-    );
-    if (!user) throw new AppError(403, 'NOT_ADMIN', 'This account is not an admin.');
     setAuthCookie(res, user);
     res.json({ user: user.toPublic() });
   }));

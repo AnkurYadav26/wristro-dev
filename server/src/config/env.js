@@ -10,7 +10,9 @@ const schema = z.object({
   JWT_EXPIRES_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   // Comma-separated allowed frontend origins (CORS + CSRF origin check). The deployed
   // frontend is included so the projects connect even if this env var is unset.
-  CLIENT_ORIGINS: z.string().default('http://localhost:5173,https://wristro-dev-igkp.vercel.app'),
+  // The storefront (5173) and the standalone admin panel (5174) are separate frontends, so both
+  // origins are allowed; add the deployed admin URL when it is live.
+  CLIENT_ORIGINS: z.string().default('http://localhost:5173,http://localhost:5174,https://wristro-dev-igkp.vercel.app'),
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   // Leave unset to auto-detect: 1 hop in production (Vercel/Render/Nginx), 0 in dev.
   TRUST_PROXY: z.coerce.number().int().min(0).optional(),
@@ -35,6 +37,9 @@ const schema = z.object({
   ADMIN_NAME: z.string().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(4, 'ADMIN_PASSWORD must be at least 4 characters').optional(),
+  // The Super Admin's mailbox. A copy of every new-admin activation code is sent here, and the
+  // second code is verified against this address. Defaults to the store owner's inbox.
+  SUPER_ADMIN_EMAIL: z.string().trim().toLowerCase().email().default('rydosphere@gmail.com'),
   // Razorpay. Optional: blank values switch payments to a simulated gateway in development.
   RAZORPAY_KEY_ID: z.string().trim().optional(),
   RAZORPAY_KEY_SECRET: z.string().trim().optional(),

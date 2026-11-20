@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Supplier } from '../../models/Supplier.js';
+import { Admin } from '../../models/Admin.js';
+import { User } from '../../models/User.js';
 import { PurchaseOrder, InventoryMovement, MOVEMENT_TYPES } from '../../models/Inventory.js';
 import { AppError, asyncHandler } from '../../utils/AppError.js';
 import { validate } from '../../middleware/validate.js';
@@ -95,7 +97,18 @@ router.get('/inventory/movements', validate({ query: z.object({ productId: objec
     const q = req.validatedQuery; const f = {};
     if (q.productId) f.productId = q.productId; if (q.type) f.type = q.type;
     const { skip, limit } = parsePaging(q, 100);
-    const [movements, total] = await Promise.all([InventoryMovement.find(f).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('productId', 'name sku').populate('actorId', 'name').lean(), InventoryMovement.countDocuments(f)]);
+    const [movements, total] = await Promise.all([InventoryMovement.find(f).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('productId', 'name sku').lean(), InventoryMovement.countDocuments(f)]);
+    // Admins now live in their own collection, so resolve the actor's name from Admin (new) and
+    // User (legacy movements) and attach it to the movement.
+    const actorIds = [...new Set(movements.map((m) => m.actorId).filter(Boolean).map(String))];
+    if (actorIds.length) {
+      const [admins, users] = await Promise.all([
+        Admin.find({ _id: { $in: actorIds } }).select('name').lean(),
+        User.find({ _id: { $in: actorIds } }).select('name').lean(),
+      ]);
+      const nameById = new Map([...admins, ...users].map((u) => [String(u._id), u.name]));
+      for (const m of movements) if (m.actorId) m.actorId = { _id: m.actorId, name: nameById.get(String(m.actorId)) || null };
+    }
     res.json({ movements, total });
   }));
 router.post('/inventory/reconcile', asyncHandler(async (_req, res) => res.json(await inv.reconcileReservedStock())));

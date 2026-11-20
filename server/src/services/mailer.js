@@ -26,6 +26,7 @@ const PURPOSE_COPY = {
   verify_email: { subject: 'Verify your WRISTORA account', lead: 'Use this code to verify your email address' },
   reset_password: { subject: 'Reset your WRISTORA password', lead: 'Use this code to reset your password' },
   admin_login: { subject: 'Your WRISTORA admin sign-in code', lead: 'Use this code to finish signing in to the WRISTORA admin panel' },
+  admin_activation: { subject: 'WRISTORA admin account activation code', lead: 'Use this code to activate a new WRISTORA administrator account' },
 };
 export function sendOtpEmail(to, code, purpose, ttlMinutes = 10) {
   const c = PURPOSE_COPY[purpose];

@@ -3,7 +3,7 @@ const { Schema } = mongoose;
 
 const otpSchema = new Schema({
   identifier: { type: String, required: true },
-  purpose: { type: String, enum: ['verify_email', 'reset_password', 'admin_login'], required: true },
+  purpose: { type: String, enum: ['verify_email', 'reset_password', 'admin_login', 'admin_activation'], required: true },
   codeHash: { type: String, required: true },
   expiresAt: { type: Date, required: true },
   attempts: { type: Number, default: 0 },

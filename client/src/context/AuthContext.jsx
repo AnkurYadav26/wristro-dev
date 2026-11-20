@@ -27,18 +27,10 @@ export function AuthProvider({ children }) {
     return () => { alive = false; };
   }, [refresh]);
 
-  // Returns the raw response: customers get { user }, admins get { otpRequired, email } and must
-  // then call verifyAdminLogin with the emailed code.
   const login = useCallback(async (email, password) => {
     const data = await api('POST', '/auth/login', { body: { email, password } });
     if (data.user) setUser(data.user);
     return data;
-  }, []);
-
-  const verifyAdminLogin = useCallback(async (email, otp) => {
-    const data = await api('POST', '/auth/verify-admin-login', { body: { email, otp } });
-    setUser(data.user);
-    return data.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -46,10 +38,7 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const value = {
-    user, loading, refresh, login, verifyAdminLogin, logout, setUser,
-    isAdmin: user?.role === 'admin',
-  };
+  const value = { user, loading, refresh, login, logout, setUser };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -38,8 +38,3 @@ export const requireAuth = [
   optionalAuth,
   (req, _res, next) => (req.user ? next() : next(new AppError(401, 'UNAUTHENTICATED', 'Please log in.'))),
 ];
-
-export const requireAdmin = [
-  ...requireAuth,
-  (req, _res, next) => (req.user.role === 'admin' ? next() : next(new AppError(403, 'FORBIDDEN', 'Admin access required.'))),
-];

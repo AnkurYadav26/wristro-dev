@@ -7,6 +7,7 @@ import env from './config/env.js';
 import { sanitizeInput, originCheck, apiLimiter } from './middleware/security.js';
 import { notFound, errorHandler } from './middleware/errors.js';
 import authRoutes from './routes/auth.js';
+import adminAuthRoutes from './routes/adminAuth.js';
 import catalogRoutes from './routes/catalog.js';
 import adminRoutes from './routes/admin/index.js';
 import cartRoutes from './routes/cart.js';
@@ -44,6 +45,7 @@ export function createApp() {
 
   app.use('/api', apiLimiter, originCheck);
   app.use('/api/auth', authRoutes);
+  app.use('/api/admin-auth', adminAuthRoutes); // administrator auth (separate cookie + collection)
   app.use('/api/cart', cartRoutes);
   app.use('/api/addresses', addressRoutes);
   app.use('/api/checkout', checkoutRoutes);

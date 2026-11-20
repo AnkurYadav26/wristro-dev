@@ -10,6 +10,7 @@ import env from '../src/config/env.js';
 import { connectDb } from '../src/config/db.js';
 import mongoose from 'mongoose';
 import { User } from '../src/models/User.js';
+import { Admin } from '../src/models/Admin.js';
 import { Category } from '../src/models/Category.js';
 import { Product } from '../src/models/Product.js';
 import { Coupon } from '../src/models/Coupon.js';
@@ -30,23 +31,25 @@ await Coupon.updateOne({ code: 'WATCH60' }, { $setOnInsert: {
   minOrderValuePaise: 0, maxDiscountPaise: null, usageLimit: null, perCustomerLimit: null } }, { upsert: true });
 console.log('coupon WATCH60 ok');
 
-if (env.ADMIN_EMAIL && env.ADMIN_PASSWORD) {
-  const email = env.ADMIN_EMAIL.toLowerCase();
+// The Super Admin lives in the Admin collection, completely separate from customer accounts.
+const superEmail = env.SUPER_ADMIN_EMAIL || env.ADMIN_EMAIL;
+if (superEmail && env.ADMIN_PASSWORD) {
+  const email = superEmail.toLowerCase();
   const name = env.ADMIN_NAME ?? 'Store Owner';
 
-  // Create the admin, or update it so its credentials always match the env vars.
-  await User.findOneAndUpdate(
+  // Create the Super Admin, or update it so its credentials always match the env vars.
+  await Admin.findOneAndUpdate(
     { email },
-    { $set: { name, role: 'admin', status: 'active', emailVerified: true, passwordHash: await bcrypt.hash(env.ADMIN_PASSWORD, 12) } },
+    { $set: { name, role: 'super_admin', status: 'active', emailVerified: true, passwordHash: await bcrypt.hash(env.ADMIN_PASSWORD, 12) } },
     { upsert: true, setDefaultsOnInsert: true },
   );
-  console.log(`admin ready: ${email}`);
+  console.log(`super admin ready: ${email}`);
 
-  // This is the ONLY admin account — demote any other user that has the admin role.
-  const demoted = await User.updateMany({ role: 'admin', email: { $ne: email } }, { $set: { role: 'customer' } });
-  if (demoted.modifiedCount) console.log(`demoted ${demoted.modifiedCount} other admin account(s) to customer`);
+  // Administrators no longer live in the User collection — demote any legacy admin-role user.
+  const demoted = await User.updateMany({ role: 'admin' }, { $set: { role: 'customer' } });
+  if (demoted.modifiedCount) console.log(`demoted ${demoted.modifiedCount} legacy admin account(s) to customer`);
 } else {
-  console.log('ADMIN_EMAIL / ADMIN_PASSWORD not set: skipped admin creation');
+  console.log('SUPER_ADMIN_EMAIL / ADMIN_PASSWORD not set: skipped Super Admin creation');
 }
 
 if (demo) {

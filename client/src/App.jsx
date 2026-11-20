@@ -14,32 +14,12 @@ import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminCategories from './pages/admin/AdminCategories';
-import AdminProducts from './pages/admin/AdminProducts';
-import AdminProductForm from './pages/admin/AdminProductForm';
-import AdminCoupons from './pages/admin/AdminCoupons';
-import AdminSuppliers from './pages/admin/AdminSuppliers';
-import AdminPurchaseOrders from './pages/admin/AdminPurchaseOrders';
-import AdminInventory from './pages/admin/AdminInventory';
-import AdminOrders from './pages/admin/AdminOrders';
-import AdminAccount from './pages/admin/AdminAccount';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <div className="page muted">Loading…</div>;
   if (!user) return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
-  return children;
-}
-
-function RequireAdmin({ children }) {
-  const { user, loading, isAdmin } = useAuth();
-  const location = useLocation();
-  if (loading) return <div className="page muted">Loading…</div>;
-  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-  if (!isAdmin) return <div className="page"><h2>403</h2><p>This account is not an admin.</p></div>;
   return children;
 }
 
@@ -81,27 +61,6 @@ export default function App() {
           }
         />
         <Route path="*" element={<NotFound />} />
-      </Route>
-
-      <Route
-        path="/admin"
-        element={
-          <RequireAdmin>
-            <AdminLayout />
-          </RequireAdmin>
-        }
-      >
-        <Route index element={<AdminDashboard />} />
-        <Route path="categories" element={<AdminCategories />} />
-        <Route path="products" element={<AdminProducts />} />
-        <Route path="products/new" element={<AdminProductForm />} />
-        <Route path="products/:id" element={<AdminProductForm />} />
-        <Route path="coupons" element={<AdminCoupons />} />
-        <Route path="suppliers" element={<AdminSuppliers />} />
-        <Route path="purchase-orders" element={<AdminPurchaseOrders />} />
-        <Route path="inventory" element={<AdminInventory />} />
-        <Route path="orders" element={<AdminOrders />} />
-        <Route path="account" element={<AdminAccount />} />
       </Route>
     </Routes>
   );
