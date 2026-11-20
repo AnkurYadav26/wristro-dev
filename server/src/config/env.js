@@ -8,9 +8,12 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   OTP_SECRET: z.string().min(32, 'OTP_SECRET must be at least 32 characters'),
   JWT_EXPIRES_DAYS: z.coerce.number().int().min(1).max(90).default(7),
-  CLIENT_ORIGINS: z.string().default('http://localhost:5173'),
+  // Comma-separated allowed frontend origins (CORS + CSRF origin check). The deployed
+  // frontend is included so the projects connect even if this env var is unset.
+  CLIENT_ORIGINS: z.string().default('http://localhost:5173,https://wristro-dev-igkp.vercel.app'),
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
-  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  // Leave unset to auto-detect: 1 hop in production (Vercel/Render/Nginx), 0 in dev.
+  TRUST_PROXY: z.coerce.number().int().min(0).optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().optional(),
@@ -49,15 +52,27 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration:\n${msg}`);
 }
 const env = parsed.data;
+const clientOrigins = env.CLIENT_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean);
+
+// Behind Vercel/Render/Nginx the app always sits behind one proxy. Trusting it keeps
+// req.ip and express-rate-limit correct. In production an explicit 0 (easy to copy from a
+// dev .env) would make every request fail, so fall back to 1 unless you set a real hop count.
+const TRUST_PROXY = env.NODE_ENV === 'production' ? env.TRUST_PROXY || 1 : env.TRUST_PROXY ?? 0;
+// The deployed frontend and API are on different sites (two *.vercel.app subdomains), so
+// the auth cookie must be SameSite=None. Local dev stays same-site and keeps the lax default.
+const COOKIE_SAMESITE = env.NODE_ENV === 'production' && env.COOKIE_SAMESITE === 'lax' ? 'none' : env.COOKIE_SAMESITE;
+
 if (env.NODE_ENV === 'production') {
   if (!env.SMTP_HOST) throw new Error('SMTP_HOST is required in production (OTP emails cannot be delivered otherwise).');
-  if (env.COOKIE_SAMESITE === 'none' && !env.CLIENT_ORIGINS.startsWith('https')) {
+  if (COOKIE_SAMESITE === 'none' && !clientOrigins.every((o) => o.startsWith('https://'))) {
     throw new Error('COOKIE_SAMESITE=none requires HTTPS client origins.');
   }
 }
 
 export default Object.freeze({
   ...env,
+  TRUST_PROXY,
+  COOKIE_SAMESITE,
   isProd: env.NODE_ENV === 'production',
-  clientOrigins: env.CLIENT_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
+  clientOrigins,
 });

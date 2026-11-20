@@ -4,7 +4,11 @@
  * - credentials: 'include' so the httpOnly auth cookie is sent.
  * - Normalises the backend error shape { error: { code, message, details } } into ApiError.
  */
-const BASE = import.meta.env.VITE_API_URL || '/api';
+// In production the frontend is hosted separately from the API, so requests must go to the
+// deployed backend; locally Vite proxies '/api' to the Express server (see vite.config.js).
+const BASE =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://wristro-dev.vercel.app/api' : '/api');
 
 export class ApiError extends Error {
   constructor(status, code, message, details) {

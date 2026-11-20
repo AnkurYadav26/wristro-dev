@@ -21,8 +21,15 @@ export function createApp() {
   app.disable('x-powered-by');
   app.set('trust proxy', env.TRUST_PROXY);
 
-  app.use(helmet());
-  app.use(cors({ origin: env.clientOrigins, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
+  // The API is consumed from a different origin (the Vercel frontend), so allow
+  // cross-origin reads; otherwise CORP: same-origin blocks the browser fetch.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(cors({
+    origin: env.clientOrigins,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+  }));
   // Payment webhooks need the RAW body to verify their signature, so they mount BEFORE express.json().
   app.use('/api/payments/webhook', webhookRoutes);
   // Admin image uploads arrive as base64 data URLs, so this path gets a much larger body limit.
