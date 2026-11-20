@@ -6,9 +6,10 @@
  */
 // In production the frontend is hosted separately from the API, so requests must go to the
 // deployed backend; locally Vite proxies '/api' to the Express server (see vite.config.js).
-const BASE =
+const BASE = (
   import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? 'https://wristro-dev.vercel.app/api' : '/api');
+  (import.meta.env.PROD ? 'https://wristro-dev.vercel.app/api' : '/api')
+).replace(/\/+$/, '');
 
 export class ApiError extends Error {
   constructor(status, code, message, details) {
@@ -30,7 +31,7 @@ const parse = (text) => {
 };
 
 export async function api(method, path, { body, headers, query } = {}) {
-  let url = BASE + path;
+  let url = `${BASE}/${path.replace(/^\/+/, '')}`;
   if (query) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
